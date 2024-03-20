@@ -163,46 +163,75 @@ const getSuggestedUsers = async (skill) => {
  * @return {Promise<userModel|Array>}
  */
 const fetchPaginatedUsers = async (query) => {
+  const isDevMode = query.dev === "true";
+
   try {
     const size = parseInt(query.size) || 100;
     const doc = (query.next || query.prev) && (await userModel.doc(query.next || query.prev).get());
 
     let dbQuery = userModel.where("roles.archived", "==", false).orderBy("username");
-    const usernameQuery = userModel.where("roles.archived", "==", false).orderBy("username");
-    const firstNameQuery = userModel.where("roles.archived", "==", false).orderBy("first_name");
-    const lastNameQuery = userModel.where("roles.archived", "==", false).orderBy("last_name");
-    let compositeQuery = [usernameQuery, firstNameQuery, lastNameQuery];
+    let compositeQuery = [];
 
-    if (query.prev) {
-      dbQuery = dbQuery.limitToLast(size);
-      compositeQuery = compositeQuery.map((query) => query.limitToLast(size));
+    if (isDevMode) {
+      const usernameQuery = userModel.where("roles.archived", "==", false).orderBy("username");
+      const firstNameQuery = userModel.where("roles.archived", "==", false).orderBy("first_name");
+      const lastNameQuery = userModel.where("roles.archived", "==", false).orderBy("last_name");
+      compositeQuery = [usernameQuery, firstNameQuery, lastNameQuery];
+
+      if (query.prev) {
+        dbQuery = dbQuery.limitToLast(size);
+        compositeQuery = compositeQuery.map((query) => query.limitToLast(size));
+      } else {
+        dbQuery = dbQuery.limit(size);
+        compositeQuery = compositeQuery.map((query) => query.limit(size));
+      }
+
+      if (Object.keys(query).length) {
+        if (query.search) {
+          dbQuery = dbQuery
+            .startAt(query.search.toLowerCase().trim())
+            .endAt(query.search.toLowerCase().trim() + "\uf8ff");
+
+          compositeQuery = compositeQuery.map((query_) =>
+            query_.startAt(query.search.toLowerCase().trim()).endAt(query.search.toLowerCase().trim() + "\uf8ff")
+          );
+        }
+        if (query.page) {
+          const offsetValue = size * parseInt(query.page);
+          dbQuery = dbQuery.offset(offsetValue);
+          compositeQuery = compositeQuery.map((query) => query.offset(offsetValue));
+        } else if (query.next) {
+          dbQuery = dbQuery.startAfter(doc);
+          compositeQuery = compositeQuery.map((query) => query.startAfter(doc));
+        } else if (query.prev) {
+          dbQuery = dbQuery.endBefore(doc);
+          compositeQuery = compositeQuery.map((query) => query.endBefore(doc));
+        }
+      }
     } else {
-      dbQuery = dbQuery.limit(size);
-      compositeQuery = compositeQuery.map((query) => query.limit(size));
-    }
-
-    if (Object.keys(query).length) {
-      if (query.search) {
-        dbQuery = dbQuery
-          .startAt(query.search.toLowerCase().trim())
-          .endAt(query.search.toLowerCase().trim() + "\uf8ff");
-
-        compositeQuery = compositeQuery.map((query_) =>
-          query_.startAt(query.search.toLowerCase().trim()).endAt(query.search.toLowerCase().trim() + "\uf8ff")
-        );
+      if (query.prev) {
+        dbQuery = dbQuery.limitToLast(size);
+      } else {
+        dbQuery = dbQuery.limit(size);
       }
-      if (query.page) {
-        const offsetValue = size * parseInt(query.page);
-        dbQuery = dbQuery.offset(offsetValue);
-        compositeQuery = compositeQuery.map((query) => query.offset(offsetValue));
-      } else if (query.next) {
-        dbQuery = dbQuery.startAfter(doc);
-        compositeQuery = compositeQuery.map((query) => query.startAfter(doc));
-      } else if (query.prev) {
-        dbQuery = dbQuery.endBefore(doc);
-        compositeQuery = compositeQuery.map((query) => query.endBefore(doc));
+
+      if (Object.keys(query).length) {
+        if (query.search) {
+          dbQuery = dbQuery
+            .startAt(query.search.toLowerCase().trim())
+            .endAt(query.search.toLowerCase().trim() + "\uf8ff");
+        }
+        if (query.page) {
+          const offsetValue = size * parseInt(query.page);
+          dbQuery = dbQuery.offset(offsetValue);
+        } else if (query.next) {
+          dbQuery = dbQuery.startAfter(doc);
+        } else if (query.prev) {
+          dbQuery = dbQuery.endBefore(doc);
+        }
       }
     }
+
     const snapshot = await dbQuery.get();
     const snapshots = await Promise.all(compositeQuery.map((query) => query.get()));
 

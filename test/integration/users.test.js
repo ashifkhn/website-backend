@@ -1246,7 +1246,7 @@ describe("Users", function () {
         });
     });
 
-    it("Should return users with first_name starting with '23' and response status code 200 - First Name", function (done) {
+    it("Should return users with first_name starting with 'An' and response status code 200 - First Name", function (done) {
       chai
         .request(app)
         .get("/users")
@@ -1270,7 +1270,7 @@ describe("Users", function () {
         });
     });
 
-    it("Should return users with last_name starting with '23' and response status code 200 - Last Name", function (done) {
+    it("Should return users with last_name starting with 'Na' and response status code 200 - Last Name", function (done) {
       chai
         .request(app)
         .get("/users")
